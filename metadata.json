@@ -1,0 +1,6 @@
+{
+  "name": "FaucetFlow - Multi-Coin Crypto Faucet",
+  "description": "High-performance multi-coin cryptocurrency faucet with 60-second cooldown RPC claims, PostgreSQL schema integration, user balance management, and admin audit dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
