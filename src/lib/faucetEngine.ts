@@ -9,7 +9,6 @@ import {
   ReferralEarning,
   UserReferralData,
 } from '../types/faucet';
-import { getSupabaseClient } from './supabaseClient';
 
 const STORAGE_KEY_LOCAL_STATE = 'faucetflow_sandbox_state_v1';
 const STORAGE_KEY_PENDING_REF = 'faucetflow_pending_ref';
@@ -71,36 +70,7 @@ function getInitialSandboxState(): SandboxDatabase {
         USDT: 0.01000000,
       },
     },
-    claims: [
-      {
-        id: 'c8273641-a182-4ef8-8273-918237461928',
-        user_id: DEMO_USERS[0].id,
-        coin: 'BTC',
-        amount: 0.00000001,
-        claimed_at: new Date(Date.now() - 140 * 1000).toISOString(),
-      },
-      {
-        id: 'b7162534-c293-4de7-9182-019283746501',
-        user_id: DEMO_USERS[0].id,
-        coin: 'LTC',
-        amount: 0.000001,
-        claimed_at: new Date(Date.now() - 320 * 1000).toISOString(),
-      },
-      {
-        id: 'd9283746-1234-4abc-8def-129384756012',
-        user_id: DEMO_USERS[1].id,
-        coin: 'DOGE',
-        amount: 0.00001,
-        claimed_at: new Date(Date.now() - 500 * 1000).toISOString(),
-      },
-      {
-        id: 'e0192837-9876-4fed-8cba-908172635412',
-        user_id: DEMO_USERS[2].id,
-        coin: 'USDT',
-        amount: 0.0001,
-        claimed_at: new Date(Date.now() - 860 * 1000).toISOString(),
-      },
-    ],
+    claims: [],
     adminLogs: [
       {
         id: 1,
@@ -154,6 +124,12 @@ function getInitialSandboxState(): SandboxDatabase {
 function loadSandboxDb(): SandboxDatabase {
   if (typeof window === 'undefined') return getInitialSandboxState();
   try {
+    // Purge any stale Supabase credentials so they never interfere
+    try {
+      localStorage.removeItem('faucetflow_supabase_url');
+      localStorage.removeItem('faucetflow_supabase_anon_key');
+    } catch (_) {}
+
     const raw = localStorage.getItem(STORAGE_KEY_LOCAL_STATE);
     if (!raw) {
       const init = getInitialSandboxState();
@@ -163,6 +139,12 @@ function loadSandboxDb(): SandboxDatabase {
     const parsed = JSON.parse(raw);
     if (!parsed.referralEarnings) {
       parsed.referralEarnings = [];
+    }
+    if (!parsed.claims) {
+      parsed.claims = [];
+    }
+    if (!parsed.balances) {
+      parsed.balances = {};
     }
     return parsed;
   } catch (err) {
@@ -180,7 +162,7 @@ function saveSandboxDb(db: SandboxDatabase) {
   }
 }
 
-// In-memory advisory locks tracking
+// In-memory locks tracking
 const inFlightAdvisoryLocks = new Set<string>();
 
 export interface ClaimResult {
@@ -194,64 +176,21 @@ export interface ClaimResult {
 
 export class FaucetEngine {
   /**
-   * Claim reward for specific coin with 60s cooldown and pg_advisory_xact_lock protection
+   * Claim reward for specific coin with 1-hour (3600 seconds) cooldown
    */
   static async claimReward(
     coin: CoinType,
     user: FaucetUser
   ): Promise<ClaimResult> {
-    const supabase = getSupabaseClient();
-
-    // 1. Live Supabase execution if configured
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.rpc('claim_reward', {
-          p_coin: coin,
-        });
-
-        if (error) {
-          // Parse cooldown or authentication exceptions from PostgreSQL
-          const isCooldown = error.message.toLowerCase().includes('wait');
-          return {
-            success: false,
-            message: error.message,
-            timeRemaining: isCooldown ? 60 : undefined,
-          };
-        }
-
-        return {
-          success: true,
-          message: `Successfully claimed ${COIN_SPECS[coin].rewardDisplay} ${coin}!`,
-          claim: {
-            id: (data as { id?: string })?.id || crypto.randomUUID(),
-            user_id: user.id,
-            coin: coin,
-            amount: COIN_SPECS[coin].rewardAmount,
-            claimed_at: (data as { claimed_at?: string })?.claimed_at || new Date().toISOString(),
-          },
-        };
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-          success: false,
-          message: `RPC error: ${message}`,
-        };
-      }
-    }
-
-    // 2. High-fidelity PostgreSQL Sandbox Engine (mirrors schema function exactly)
     const lockKey = `${user.id}:${coin}`;
     if (inFlightAdvisoryLocks.has(lockKey)) {
       return {
         success: false,
-        message: 'Concurrent claim blocked by pg_advisory_xact_lock.',
+        message: 'Concurrent claim blocked. Please try again.',
       };
     }
 
     inFlightAdvisoryLocks.add(lockKey);
-
-    // Simulate advisory lock transaction window
-    await new Promise((r) => setTimeout(r, 220));
 
     try {
       const db = loadSandboxDb();
@@ -286,7 +225,7 @@ export class FaucetEngine {
       // Calculate reward
       const reward = COIN_SPECS[coin].rewardAmount;
 
-      // Update balances table: ON CONFLICT(user_id, coin) DO UPDATE SET amount = amount + excluded.amount
+      // Update balances
       if (!db.balances[user.id]) {
         db.balances[user.id] = { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
       }
@@ -335,13 +274,114 @@ export class FaucetEngine {
 
       return {
         success: true,
-        message: `Claimed +${COIN_SPECS[coin].rewardDisplay} ${coin} (${COIN_SPECS[coin].unitNickname})!`,
+        message: `Claimed +${COIN_SPECS[coin].rewardDisplay} ${coin} (${COIN_SPECS[coin].unitNickname})! 1-hour cooldown started.`,
         claim: newClaim,
         newBalance: newBal,
+        timeRemaining: 3600,
         advisoryLockUsed: true,
       };
     } finally {
       inFlightAdvisoryLocks.delete(lockKey);
+    }
+  }
+
+  /**
+   * Credit reward earned from completing an offer in Junkie or Adollar offerwall
+   */
+  static async creditOfferReward(
+    user: FaucetUser,
+    offer: {
+      id: string;
+      title: string;
+      provider: 'junkie' | 'adollar';
+      coin: CoinType;
+      coinAmount: number;
+      payoutUsd: number;
+    }
+  ): Promise<{ success: boolean; message: string; newBalance: number; claim?: Claim }> {
+    const db = loadSandboxDb();
+
+    if (!db.balances[user.id]) {
+      db.balances[user.id] = { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
+    }
+
+    const coin = offer.coin;
+    const currentBal = db.balances[user.id][coin] || 0;
+    const newBal = Number((currentBal + offer.coinAmount).toFixed(8));
+    db.balances[user.id][coin] = newBal;
+
+    // Add to ledger
+    const newClaim: Claim = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      coin: coin,
+      amount: offer.coinAmount,
+      claimed_at: new Date().toISOString(),
+    };
+    db.claims.unshift(newClaim);
+
+    // Record completed offer ID in user's completed list
+    const completedKey = `faucetflow_completed_offers_${user.id}`;
+    try {
+      const stored = localStorage.getItem(completedKey);
+      const parsed: string[] = stored ? JSON.parse(stored) : [];
+      if (!parsed.includes(offer.id)) {
+        parsed.push(offer.id);
+        localStorage.setItem(completedKey, JSON.stringify(parsed));
+      }
+    } catch (e) {
+      console.error('Failed to update completed offers:', e);
+    }
+
+    // 10% referral bonus to referrer
+    const userRecord = db.users.find((u) => u.id === user.id);
+    const referrerId = userRecord?.referrer_id || user.referrer_id;
+    if (referrerId && referrerId !== user.id) {
+      const bonus10Pct = Number((offer.coinAmount * 0.10).toFixed(8));
+      if (bonus10Pct > 0) {
+        if (!db.balances[referrerId]) {
+          db.balances[referrerId] = { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
+        }
+        const prevRefBal = db.balances[referrerId][coin] || 0;
+        db.balances[referrerId][coin] = Number((prevRefBal + bonus10Pct).toFixed(8));
+
+        if (!db.referralEarnings) {
+          db.referralEarnings = [];
+        }
+        db.referralEarnings.unshift({
+          id: crypto.randomUUID(),
+          referrer_id: referrerId,
+          referee_id: user.id,
+          referee_email: user.email,
+          coin: coin,
+          amount: bonus10Pct,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    saveSandboxDb(db);
+
+    const providerName = offer.provider === 'junkie' ? 'Junkie' : 'Adollar';
+
+    return {
+      success: true,
+      message: `Success! Completed "${offer.title}" on ${providerName} offerwall. +${offer.coinAmount} ${coin} ($${offer.payoutUsd.toFixed(2)}) credited to your wallet!`,
+      newBalance: newBal,
+      claim: newClaim,
+    };
+  }
+
+  /**
+   * Get set of completed offer IDs for a user
+   */
+  static getCompletedOfferIds(userId: string): string[] {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(`faucetflow_completed_offers_${userId}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
     }
   }
 
@@ -351,63 +391,18 @@ export class FaucetEngine {
   static async getBalances(
     user: FaucetUser
   ): Promise<Record<CoinType, number>> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('balances')
-          .select('coin, amount')
-          .eq('user_id', user.id);
-
-        if (!error && data) {
-          const map: Record<CoinType, number> = {
-            BTC: 0,
-            LTC: 0,
-            DOGE: 0,
-            USDT: 0,
-          };
-          data.forEach((row: { coin: CoinType; amount: string | number }) => {
-            if (row.coin in map) {
-              map[row.coin] = parseFloat(String(row.amount)) || 0;
-            }
-          });
-          return map;
-        }
-      } catch (err) {
-        console.error('Supabase getBalances error:', err);
-      }
-    }
-
     const db = loadSandboxDb();
-    return db.balances[user.id] || { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
+    if (!db.balances[user.id]) {
+      db.balances[user.id] = { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
+      saveSandboxDb(db);
+    }
+    return db.balances[user.id];
   }
 
   /**
    * Fetch claims history for user or all if admin
    */
   static async getClaims(user: FaucetUser, allForAdmin = false): Promise<Claim[]> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        let query = supabase.from('claims').select('*').order('claimed_at', { ascending: false }).limit(100);
-        if (!allForAdmin || !user.isAdmin) {
-          query = query.eq('user_id', user.id);
-        }
-        const { data, error } = await query;
-        if (!error && data) {
-          return data.map((item: any) => ({
-            id: item.id,
-            user_id: item.user_id,
-            coin: item.coin,
-            amount: parseFloat(item.amount) || 0,
-            claimed_at: item.claimed_at,
-          }));
-        }
-      } catch (err) {
-        console.error('Supabase getClaims error:', err);
-      }
-    }
-
     const db = loadSandboxDb();
     if (allForAdmin && user.isAdmin) {
       return [...db.claims];
@@ -416,7 +411,7 @@ export class FaucetEngine {
   }
 
   /**
-   * Fetch cooldown status for each coin for user
+   * Fetch cooldown status for each coin for user (3600s = 1 hour)
    */
   static async getCooldowns(user: FaucetUser): Promise<Record<CoinType, number>> {
     const claims = await this.getClaims(user, false);
@@ -429,13 +424,19 @@ export class FaucetEngine {
 
     const coins: CoinType[] = ['BTC', 'LTC', 'DOGE', 'USDT'];
     const now = Date.now();
+    const COOLDOWN_SECONDS = 3600;
 
     for (const coin of coins) {
-      const coinClaims = claims.filter((c) => c.coin === coin);
+      const coinClaims = claims
+        .filter((c) => c.coin === coin)
+        .sort(
+          (a, b) =>
+            new Date(b.claimed_at).getTime() - new Date(a.claimed_at).getTime()
+        );
+
       if (coinClaims.length > 0) {
         const lastClaimTime = new Date(coinClaims[0].claimed_at).getTime();
         const elapsed = (now - lastClaimTime) / 1000;
-        const COOLDOWN_SECONDS = 3600;
         if (elapsed < COOLDOWN_SECONDS) {
           result[coin] = Math.ceil(COOLDOWN_SECONDS - elapsed);
         }
@@ -449,18 +450,6 @@ export class FaucetEngine {
    * Admin RPC: admin_list_users()
    */
   static async adminListUsers(): Promise<AdminUser[]> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.rpc('admin_list_users');
-        if (!error && data) {
-          return data;
-        }
-      } catch (err) {
-        console.error('admin_list_users RPC error:', err);
-      }
-    }
-
     const db = loadSandboxDb();
     return db.users.map((u) => ({
       id: u.id,
@@ -478,19 +467,6 @@ export class FaucetEngine {
     details: Record<string, unknown> = {},
     actorUser?: FaucetUser
   ): Promise<void> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        await supabase.rpc('admin_log_activity', {
-          p_action: action,
-          p_details: details,
-        });
-        return;
-      } catch (err) {
-        console.error('admin_log_activity RPC error:', err);
-      }
-    }
-
     const db = loadSandboxDb();
     const newLog: AdminActivityLog = {
       id: db.adminLogs.length + 1,
@@ -509,18 +485,6 @@ export class FaucetEngine {
    * Admin RPC: admin_list_activity_logs()
    */
   static async adminListActivityLogs(): Promise<AdminActivityLog[]> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.rpc('admin_list_activity_logs');
-        if (!error && data) {
-          return data;
-        }
-      } catch (err) {
-        console.error('admin_list_activity_logs RPC error:', err);
-      }
-    }
-
     const db = loadSandboxDb();
     return [...db.adminLogs];
   }
@@ -529,21 +493,9 @@ export class FaucetEngine {
    * Check if current user is admin
    */
   static async checkIsAdmin(user: FaucetUser): Promise<boolean> {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      try {
-        const { data, error } = await supabase.rpc('is_admin');
-        if (!error && typeof data === 'boolean') {
-          return data;
-        }
-      } catch (err) {
-        console.error('is_admin RPC error:', err);
-      }
-    }
     return user.isAdmin;
   }
 
-  /**
   /**
    * Self-service registration with ANY email - no admin approval required
    */
@@ -555,48 +507,20 @@ export class FaucetEngine {
     const cleanEmail = email.trim().toLowerCase();
     const cleanUsername = username?.trim() || cleanEmail.split('@')[0];
 
-    const supabase = getSupabaseClient();
-    if (supabase && password) {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: password,
-          options: {
-            data: { username: cleanUsername },
-          },
-        });
-        if (error) {
-          return { success: false, message: error.message };
-        }
-        if (data.user) {
-          const user: FaucetUser = {
-            id: data.user.id,
-            email: cleanEmail,
-            username: cleanUsername,
-            isAdmin: false,
-          };
-          return {
-            success: true,
-            user,
-            message: 'Account created successfully! Welcome to FaucetFlow.',
-          };
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, message: msg };
-      }
-    }
-
-    // Local / Sandbox engine self-signup
+    // Local autonomous engine self-signup with any email
     const db = loadSandboxDb();
     const existing = db.users.find(
       (u) => u.email.toLowerCase() === cleanEmail
     );
     if (existing) {
+      if (!db.balances[existing.id]) {
+        db.balances[existing.id] = { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
+        saveSandboxDb(db);
+      }
       return {
         success: true,
         user: existing,
-        message: `Welcome back, ${existing.username || existing.email}!`,
+        message: `Welcome back, ${existing.username || existing.email}! Your profile is ready.`,
       };
     }
 
@@ -629,7 +553,7 @@ export class FaucetEngine {
     };
 
     db.users.push(newUser);
-    // Initialize 0 balances for all 4 coins (matches PostgreSQL handle_new_user trigger)
+    // Initialize 0 balances for all 4 coins
     db.balances[newUser.id] = {
       BTC: 0,
       LTC: 0,
@@ -642,7 +566,7 @@ export class FaucetEngine {
     return {
       success: true,
       user: newUser,
-      message: 'Account created instantly! Ready to claim faucet rewards.',
+      message: `Account created instantly! Welcome ${newUser.username}, your wallet profile is ready.`,
     };
   }
 
@@ -655,49 +579,18 @@ export class FaucetEngine {
   ): Promise<{ success: boolean; user?: FaucetUser; message: string }> {
     const cleanEmail = email.trim().toLowerCase();
 
-    const supabase = getSupabaseClient();
-    if (supabase && password) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password,
-        });
-        if (error) {
-          return { success: false, message: error.message };
-        }
-        if (data.user) {
-          const isAdmin = await this.checkIsAdmin({
-            id: data.user.id,
-            email: cleanEmail,
-            username: data.user.user_metadata?.username || cleanEmail.split('@')[0],
-            isAdmin: false,
-          });
-          return {
-            success: true,
-            user: {
-              id: data.user.id,
-              email: cleanEmail,
-              username: data.user.user_metadata?.username || cleanEmail.split('@')[0],
-              isAdmin,
-            },
-            message: 'Signed in successfully.',
-          };
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, message: msg };
-      }
-    }
-
     const db = loadSandboxDb();
     const user = db.users.find((u) => u.email.toLowerCase() === cleanEmail);
     if (user) {
       db.currentUserId = user.id;
+      if (!db.balances[user.id]) {
+        db.balances[user.id] = { BTC: 0, LTC: 0, DOGE: 0, USDT: 0 };
+      }
       saveSandboxDb(db);
       return {
         success: true,
         user,
-        message: `Welcome back, ${user.username || user.email}!`,
+        message: `Welcome back, ${user.username || user.email}! Your profile is ready.`,
       };
     }
 

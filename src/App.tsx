@@ -9,6 +9,7 @@ import { Navbar } from './components/Navbar';
 import { FaucetStations } from './components/FaucetStations';
 import { ClaimsLedger } from './components/ClaimsLedger';
 import { ReferralProgram } from './components/ReferralProgram';
+import { Offerwalls } from './components/Offerwalls';
 import { TelegramContact, TELEGRAM_INVITE_URL } from './components/TelegramContact';
 import { AuthModal } from './components/AuthModal';
 import {
@@ -22,14 +23,16 @@ import {
   Gift,
   History,
   Droplets,
+  Layers,
+  Flame,
 } from 'lucide-react';
 
 const STORAGE_SESSION_KEY = 'faucetflow_session_user';
 const FAUCET_COOLDOWN_SECONDS = 3600; // 1 hour
 
 export default function App() {
-  // User navigation tabs: 'faucet' | 'claims' | 'referrals'
-  const [userTab, setUserTab] = useState<'faucet' | 'claims' | 'referrals'>('faucet');
+  // User navigation tabs: 'faucet' | 'offerwalls' | 'claims' | 'referrals'
+  const [userTab, setUserTab] = useState<'faucet' | 'offerwalls' | 'claims' | 'referrals'>('faucet');
 
   // Currently logged in user (null if signed out)
   const [currentUser, setCurrentUser] = useState<FaucetUser | null>(() => {
@@ -46,9 +49,8 @@ export default function App() {
         console.error('Failed to parse stored session:', e);
       }
     }
-    // Default initial user for seamless immediate experience
-    const users = FaucetEngine.getSandboxUsers();
-    return users[0] || DEMO_USERS[0];
+    // Null initially if no stored session, so guest users see Sign In and Sign Up buttons
+    return null;
   });
 
   const [balances, setBalances] = useState<Record<CoinType, number>>({
@@ -217,6 +219,15 @@ export default function App() {
     showToast('Signed out successfully. Sign in or register anytime!', 'info');
   };
 
+  const handleRewardEarned = (coin: CoinType, amount: number, message: string) => {
+    setBalances((prev) => ({
+      ...prev,
+      [coin]: Number(((prev[coin] || 0) + amount).toFixed(8)),
+    }));
+    loadUserData();
+    showToast(message, 'success');
+  };
+
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white">
       {/* Toast Notification */}
@@ -269,6 +280,18 @@ export default function App() {
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
+                  onClick={() => setUserTab('offerwalls')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-500/50 bg-gradient-to-r from-purple-950/60 to-indigo-950/60 text-purple-200 hover:from-purple-900/60 hover:to-indigo-900/60 transition-colors font-semibold text-xs shadow-sm"
+                >
+                  <Layers className="h-3.5 w-3.5 text-purple-400" />
+                  <span>Offerwalls (Junkie & Adollar)</span>
+                  <span className="flex items-center gap-0.5 rounded bg-purple-500/30 px-1 py-0.2 text-[9px] text-purple-200 font-bold">
+                    <Flame className="h-2.5 w-2.5 text-amber-400" />
+                    HOT
+                  </span>
+                </button>
+
+                <button
                   onClick={() => setUserTab('referrals')}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/40 transition-colors font-semibold text-xs shadow-sm"
                 >
@@ -296,6 +319,14 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setUserTab('offerwalls')}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-purple-500/40 bg-purple-950/40 text-purple-300 hover:bg-purple-900/40 transition-colors text-xs font-medium"
+                >
+                  <Layers className="h-3.5 w-3.5 text-purple-400" />
+                  <span>Junkie & Adollar Offerwalls</span>
+                </button>
+
                 <button
                   onClick={handleOpenSignIn}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white transition-colors font-medium text-xs shadow-sm"
@@ -326,7 +357,21 @@ export default function App() {
             onRefresh={loadUserData}
             isClaiming={isClaiming}
             onNavigateToReferrals={() => setUserTab('referrals')}
+            onNavigateToOfferwalls={() => setUserTab('offerwalls')}
             onOpenAuth={handleOpenSignIn}
+            onOpenSignIn={handleOpenSignIn}
+            onOpenSignUp={handleOpenSignUp}
+          />
+        )}
+
+        {/* Tab: Offerwalls (Junkie & Adollar) */}
+        {userTab === 'offerwalls' && (
+          <Offerwalls
+            currentUser={currentUser}
+            onRewardEarned={handleRewardEarned}
+            onOpenSignIn={handleOpenSignIn}
+            onOpenSignUp={handleOpenSignUp}
+            onNavigateToClaims={() => setUserTab('claims')}
           />
         )}
 

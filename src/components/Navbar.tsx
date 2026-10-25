@@ -7,13 +7,17 @@ import {
   LogIn,
   UserPlus,
   Gift,
+  Layers,
+  Flame,
 } from 'lucide-react';
 import { TELEGRAM_INVITE_URL } from './TelegramContact';
 import { UserProfileMenu } from './UserProfileMenu';
 
+export type NavTabType = 'faucet' | 'offerwalls' | 'claims' | 'referrals';
+
 interface NavbarProps {
-  currentTab: 'faucet' | 'claims' | 'referrals';
-  setCurrentTab: (tab: 'faucet' | 'claims' | 'referrals') => void;
+  currentTab: NavTabType;
+  setCurrentTab: (tab: NavTabType) => void;
   currentUser: FaucetUser | null;
   balances: Record<CoinType, number>;
   onOpenSignIn: () => void;
@@ -32,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-[#090d16]/95 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         {/* Zone 1: Logo and Brand Name */}
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -46,8 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Zone 2: Navigation Links (Faucet, Claims, Referrals, Telegram) */}
-        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-300">
+        {/* Zone 2: Navigation Links (Faucet, Offerwalls [Junkie & Adollar], Claims, Referrals, Telegram) */}
+        <nav className="hidden lg:flex items-center gap-5 text-sm font-medium text-slate-300">
           <button
             onClick={() => setCurrentTab('faucet')}
             className={`flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 py-1 ${
@@ -58,6 +62,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Droplets className="h-3.5 w-3.5" />
             <span>Faucet Stations (1h)</span>
+          </button>
+
+          {/* Offerwalls: Junkie & Adollar */}
+          <button
+            onClick={() => setCurrentTab('offerwalls')}
+            className={`flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 py-1 ${
+              currentTab === 'offerwalls'
+                ? 'text-purple-400 border-b-2 border-purple-400 font-bold'
+                : 'hover:text-white'
+            }`}
+          >
+            <Layers className="h-3.5 w-3.5 text-purple-400" />
+            <span>Offerwalls (Junkie & Adollar)</span>
+            <span className="flex items-center gap-0.5 rounded-full bg-gradient-to-r from-purple-500/20 to-emerald-500/20 border border-purple-500/40 px-1.5 py-0.2 text-[10px] font-bold text-purple-300">
+              <Flame className="h-2.5 w-2.5 text-amber-400" />
+              HOT
+            </span>
           </button>
 
           <button
@@ -106,6 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onSignOut={onSignOut}
               onNavigateToClaims={() => setCurrentTab('claims')}
               onNavigateToReferrals={() => setCurrentTab('referrals')}
+              onNavigateToOfferwalls={() => setCurrentTab('offerwalls')}
             />
           ) : (
             /* When logged out: Show distinct Sign In and Sign Up buttons */
@@ -137,6 +159,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           className={`whitespace-nowrap ${currentTab === 'faucet' ? 'text-cyan-400 font-bold' : ''}`}
         >
           Faucet (1h)
+        </button>
+        <button
+          onClick={() => setCurrentTab('offerwalls')}
+          className={`whitespace-nowrap flex items-center gap-1 ${
+            currentTab === 'offerwalls' ? 'text-purple-400 font-bold' : 'text-purple-300'
+          }`}
+        >
+          <span>Offerwalls</span>
+          <span className="rounded bg-purple-500/20 px-1 text-[9px] text-purple-300">Junkie/Adollar</span>
         </button>
         <button
           onClick={() => setCurrentTab('claims')}

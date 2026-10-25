@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaucetUser, CoinType, COIN_SPECS } from '../types/faucet';
+import { FaucetUser, CoinType } from '../types/faucet';
 import {
   User,
   LogOut,
@@ -10,6 +10,8 @@ import {
   Wallet,
   Copy,
   Check,
+  Layers,
+  Flame,
 } from 'lucide-react';
 import { FaucetEngine } from '../lib/faucetEngine';
 
@@ -19,6 +21,7 @@ interface UserProfileMenuProps {
   onSignOut: () => void;
   onNavigateToClaims: () => void;
   onNavigateToReferrals: () => void;
+  onNavigateToOfferwalls?: () => void;
 }
 
 export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
@@ -27,6 +30,7 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
   onSignOut,
   onNavigateToClaims,
   onNavigateToReferrals,
+  onNavigateToOfferwalls,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [copiedRef, setCopiedRef] = useState(false);
@@ -161,6 +165,25 @@ export const UserProfileMenu: React.FC<UserProfileMenuProps> = ({
                 <Copy className="h-3 w-3 text-slate-500" />
               )}
             </button>
+
+            {/* Offerwalls: Junkie & Adollar */}
+            {onNavigateToOfferwalls && (
+              <button
+                onClick={() => {
+                  onNavigateToOfferwalls();
+                  setIsOpen(false);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-purple-300 hover:text-purple-200 hover:bg-purple-950/40 border border-purple-500/20 transition-colors font-medium"
+              >
+                <span className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-purple-400" />
+                  <span>Junkie & Adollar Offerwalls</span>
+                </span>
+                <span className="text-[9px] bg-purple-500/30 text-purple-200 font-bold px-1.5 py-0.2 rounded border border-purple-500/30">
+                  HOT
+                </span>
+              </button>
+            )}
 
             {/* Claims ledger shortcut */}
             <button

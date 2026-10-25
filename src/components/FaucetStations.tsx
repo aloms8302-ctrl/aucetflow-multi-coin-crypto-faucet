@@ -12,6 +12,11 @@ import {
   ExternalLink,
   ShieldCheck,
   UserCheck,
+  LogIn,
+  UserPlus,
+  Layers,
+  Flame,
+  ChevronRight,
 } from 'lucide-react';
 
 export const CLAIM_SHORTLINK = 'https://surl.li/pwwkjr';
@@ -25,7 +30,10 @@ interface FaucetStationsProps {
   onRefresh: () => Promise<void>;
   isClaiming: Record<CoinType, boolean>;
   onNavigateToReferrals?: () => void;
+  onNavigateToOfferwalls?: () => void;
   onOpenAuth?: () => void;
+  onOpenSignIn?: () => void;
+  onOpenSignUp?: () => void;
 }
 
 export const FaucetStations: React.FC<FaucetStationsProps> = ({
@@ -36,7 +44,10 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
   onRefresh,
   isClaiming,
   onNavigateToReferrals,
+  onNavigateToOfferwalls,
   onOpenAuth,
+  onOpenSignIn,
+  onOpenSignUp,
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -269,13 +280,22 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
 
                 {/* Claim Action */}
                 {!currentUser ? (
-                  <button
-                    onClick={onOpenAuth}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-xs font-bold transition-all bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-md active:scale-[0.98]"
-                  >
-                    <Zap className="h-3.5 w-3.5" />
-                    <span>Sign In to Claim {spec.symbol}</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={onOpenSignIn || onOpenAuth}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 px-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all active:scale-[0.98]"
+                    >
+                      <LogIn className="h-3.5 w-3.5 text-cyan-400" />
+                      <span>Sign In</span>
+                    </button>
+                    <button
+                      onClick={onOpenSignUp || onOpenAuth}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2.5 px-2 text-xs font-bold transition-all bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-md active:scale-[0.98]"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Sign Up</span>
+                    </button>
+                  </div>
                 ) : isPending ? (
                   <button
                     disabled
@@ -287,9 +307,9 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
                 ) : cooldown > 0 ? (
                   <button
                     disabled
-                    className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-xs font-semibold bg-slate-800/80 text-slate-500 cursor-not-allowed border border-slate-800"
+                    className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-xs font-bold bg-slate-800/90 text-amber-300 cursor-not-allowed border border-amber-500/30 shadow-inner"
                   >
-                    <Lock className="h-3.5 w-3.5" />
+                    <Lock className="h-3.5 w-3.5 text-amber-400" />
                     <span>Wait {formatTimeRemaining(cooldown)}</span>
                   </button>
                 ) : (
@@ -314,6 +334,37 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
             </div>
           );
         })}
+      </div>
+
+      {/* Offerwalls Promotion Banner: Junkie & Adollar */}
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 p-5 sm:p-6 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-2xl">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1 rounded-full bg-purple-500/20 px-2.5 py-0.5 text-[10px] font-bold text-purple-300 border border-purple-500/30">
+                <Flame className="h-3 w-3 text-amber-400" />
+                2 OFFERWALLS ACTIVE
+              </span>
+              <span className="text-xs font-semibold text-emerald-400">Earn up to $12.00 / Task</span>
+            </div>
+            <h3 className="text-lg font-bold text-white">
+              Want to earn extra crypto during the 1-hour faucet cooldown?
+            </h3>
+            <p className="text-xs text-slate-300">
+              Browse <strong>Junkie</strong> for quick opinion surveys ($0.50 - $3.50) and <strong>Adollar</strong> for games & app install rewards ($1.00 - $12.00). Complete tasks anytime and get credited instantly to your profile!
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onNavigateToOfferwalls}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-600 hover:from-purple-500 hover:via-indigo-500 hover:to-cyan-500 text-white font-bold text-xs shadow-lg shadow-purple-950/50 transition-all shrink-0 active:scale-[0.98]"
+          >
+            <Layers className="h-4 w-4" />
+            <span>Open Junkie & Adollar Offerwalls</span>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {/* Feature Highlights Grid */}
