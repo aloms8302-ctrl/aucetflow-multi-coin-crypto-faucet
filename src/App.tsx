@@ -13,6 +13,7 @@ import { Offerwalls } from './components/Offerwalls';
 import { TelegramContact, TELEGRAM_INVITE_URL } from './components/TelegramContact';
 import { AuthModal } from './components/AuthModal';
 import { MiddleAdsSection } from './components/AdBanners';
+import { PopunderAdHelper } from './components/PopunderAdHelper';
 import {
   CheckCircle2,
   AlertCircle,
@@ -265,6 +266,9 @@ export default function App() {
       />
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-10">
+        {/* Popunder Diagnostics & Iframe Helper */}
+        <PopunderAdHelper />
+
         {/* Top Strip: Dynamic depending on whether user is signed in or out */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/40 border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs">
           {currentUser ? (
