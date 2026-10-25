@@ -232,7 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
           <div className="flex items-center gap-2 text-slate-300">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-            <span>Instant 60s reward claims — zero waiting for admin approval</span>
+            <span>1-hour recurring reward claims — zero waiting for admin approval</span>
           </div>
         </div>
 

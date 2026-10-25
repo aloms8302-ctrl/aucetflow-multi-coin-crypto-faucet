@@ -10,19 +10,22 @@ import {
   Zap,
   Gift,
   ExternalLink,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 
 export const CLAIM_SHORTLINK = 'https://surl.li/pwwkjr';
+export const COOLDOWN_DURATION_SECONDS = 3600; // 1 Hour
 
 interface FaucetStationsProps {
-  currentUser: FaucetUser;
+  currentUser: FaucetUser | null;
   balances: Record<CoinType, number>;
   cooldowns: Record<CoinType, number>;
   onClaim: (coin: CoinType) => Promise<void>;
   onRefresh: () => Promise<void>;
   isClaiming: Record<CoinType, boolean>;
-  isLiveSupabase: boolean;
   onNavigateToReferrals?: () => void;
+  onOpenAuth?: () => void;
 }
 
 export const FaucetStations: React.FC<FaucetStationsProps> = ({
@@ -32,8 +35,8 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
   onClaim,
   onRefresh,
   isClaiming,
-  isLiveSupabase,
   onNavigateToReferrals,
+  onOpenAuth,
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -41,6 +44,17 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
     setIsRefreshing(true);
     await onRefresh();
     setTimeout(() => setIsRefreshing(false), 400);
+  };
+
+  // Helper to format remaining time in 1-hour cooldown
+  const formatTimeRemaining = (seconds: number) => {
+    if (seconds <= 0) return 'Ready to claim';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
+    if (m > 0) return `${m}m ${s.toString().padStart(2, '0')}s`;
+    return `${s}s`;
   };
 
   // Calculate total estimated portfolio USD value
@@ -61,23 +75,26 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-              <span>Authenticated Profile</span>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono text-cyan-400">{currentUser.email}</span>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono text-slate-500">
-                UUID: {currentUser.id.slice(0, 8)}...{currentUser.id.slice(-4)}
-              </span>
+              {currentUser ? (
+                <>
+                  <UserCheck className="h-3.5 w-3.5 text-cyan-400" />
+                  <span className="font-mono text-cyan-400">{currentUser.email}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-emerald-400">Verified Wallet</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-amber-400">Guest Visitor</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Sign in or register to track rewards</span>
+                </>
+              )}
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Multi-Coin Faucet Stations
+              1-Hour Multi-Coin Faucet Stations
             </h1>
             <p className="text-sm text-slate-400 max-w-2xl">
-              Claim cryptocurrency rewards every 60 seconds. Secured by PostgreSQL{' '}
-              <code className="text-cyan-300 font-mono text-xs bg-slate-800/80 px-1 py-0.5 rounded">
-                pg_advisory_xact_lock
-              </code>{' '}
-              and immutable ledger auditing.
+              Claim free cryptocurrency rewards every 1 hour (60 minutes). Payouts are credited instantly to your portfolio with zero fees.
             </p>
           </div>
 
@@ -106,23 +123,17 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
           </div>
         </div>
 
-        {/* Informational banner: PostgreSQL Advisory Locking & Security Definer */}
+        {/* Informational banner: 1-Hour Cooldown & Automated Security */}
         <div className="mt-5 border-t border-slate-800/80 pt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
           <div className="flex items-center gap-2">
-            <Lock className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+            <Clock className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
             <span>
-              <strong>60s Cooldown Guard:</strong> Atomic transaction lock per (user_id, coin) prevents double-claims.
+              <strong>1-Hour Cooldown Guard:</strong> Claims refresh once every 60 minutes for each individual coin.
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <span>
-              Engine:{' '}
-              <strong className="text-slate-300">
-                {isLiveSupabase ? 'Supabase RPC (claim_reward)' : 'PostgreSQL Engine'}
-              </strong>
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>Numeric Precision: <strong className="text-slate-300 font-mono">28,12</strong></span>
+          <div className="flex items-center gap-2 text-emerald-400 font-medium">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            <span>Instant & Automated Payouts</span>
           </div>
         </div>
       </div>
@@ -161,7 +172,10 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
           const isPending = isClaiming[coin] || false;
           const currentBal = balances[coin] || 0;
           const estUsd = currentBal * spec.estUsdPrice;
-          const progressPercent = cooldown > 0 ? ((60 - cooldown) / 60) * 100 : 100;
+          const progressPercent =
+            cooldown > 0
+              ? Math.max(0, Math.min(100, ((COOLDOWN_DURATION_SECONDS - cooldown) / COOLDOWN_DURATION_SECONDS) * 100))
+              : 100;
 
           return (
             <div
@@ -181,7 +195,7 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
                         </span>
                       </h3>
                       <p className="text-xs text-slate-400">
-                        {spec.unitNickname} / claim
+                        {spec.unitNickname} / 1 hour
                       </p>
                     </div>
                   </div>
@@ -190,7 +204,7 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
                 {/* Reward Highlight */}
                 <div className="mt-4 rounded-lg border border-slate-800 bg-[#090d16] p-3">
                   <div className="flex items-baseline justify-between">
-                    <span className="text-xs text-slate-400">Fixed Reward</span>
+                    <span className="text-xs text-slate-400">Hourly Reward</span>
                     <span className="text-xs text-slate-500 font-mono">
                       ~${(spec.rewardAmount * spec.estUsdPrice).toFixed(6)}
                     </span>
@@ -223,40 +237,52 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
                 </div>
               </div>
 
-              {/* Bottom: Cooldown Progress & Claim Action */}
+              {/* Bottom: 1-Hour Cooldown Progress & Claim Action */}
               <div className="mt-6 space-y-3">
-                {/* 60-Second Cooldown Bar */}
+                {/* 1-Hour Cooldown Bar */}
                 <div>
                   <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5 font-mono">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3 text-cyan-400" />
-                      {cooldown > 0 ? 'Cooldown' : 'Status'}
+                      {cooldown > 0 ? 'Cooldown (1h)' : 'Status'}
                     </span>
-                    <span className={cooldown > 0 ? 'text-amber-400 font-bold' : 'text-emerald-400'}>
-                      {cooldown > 0 ? `${cooldown}s left` : 'Ready to claim'}
+                    <span
+                      className={
+                        cooldown > 0
+                          ? 'text-amber-400 font-bold'
+                          : 'text-emerald-400 font-medium'
+                      }
+                    >
+                      {formatTimeRemaining(cooldown)}
                     </span>
                   </div>
 
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
                     <div
-                      className={`h-full transition-all duration-300 ${
-                        cooldown > 0
-                          ? 'bg-amber-400'
-                          : 'bg-emerald-400'
+                      className={`h-full transition-all duration-500 ${
+                        cooldown > 0 ? 'bg-amber-400' : 'bg-emerald-400'
                       }`}
                       style={{ width: `${progressPercent}%` }}
                     />
                   </div>
                 </div>
 
-                {/* Claim Action with https://surl.li/pwwkjr integration */}
-                {isPending ? (
+                {/* Claim Action */}
+                {!currentUser ? (
+                  <button
+                    onClick={onOpenAuth}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-xs font-bold transition-all bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white shadow-md active:scale-[0.98]"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                    <span>Sign In to Claim {spec.symbol}</span>
+                  </button>
+                ) : isPending ? (
                   <button
                     disabled
                     className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-xs font-semibold bg-cyan-700 text-white cursor-wait"
                   >
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Locking & Claiming...</span>
+                    <span>Processing Claim...</span>
                   </button>
                 ) : cooldown > 0 ? (
                   <button
@@ -264,7 +290,7 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
                     className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 px-4 text-xs font-semibold bg-slate-800/80 text-slate-500 cursor-not-allowed border border-slate-800"
                   >
                     <Lock className="h-3.5 w-3.5" />
-                    <span>Wait {cooldown}s</span>
+                    <span>Wait {formatTimeRemaining(cooldown)}</span>
                   </button>
                 ) : (
                   <a
@@ -290,31 +316,28 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
         })}
       </div>
 
-      {/* Quick Architecture Callout */}
-      <div className="rounded-xl border border-slate-800/80 bg-slate-900/40 p-5 text-sm text-slate-400">
-        <h4 className="font-semibold text-slate-200 mb-2 flex items-center gap-2">
-          <Zap className="h-4 w-4 text-cyan-400" />
-          Behind the Scenes: PostgreSQL Security Definer & RLS
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs mt-3">
-          <div className="p-3 bg-[#090d16] rounded-lg border border-slate-800">
-            <span className="font-semibold text-slate-200 block mb-1">
-              1. Direct Insert Prohibited
-            </span>
-            Direct client modifications to <code className="text-cyan-300">public.balances</code> are blocked by RLS policies. Mutations only happen through the verified RPC.
-          </div>
-          <div className="p-3 bg-[#090d16] rounded-lg border border-slate-800">
-            <span className="font-semibold text-slate-200 block mb-1">
-              2. Advisory Lock Serialization
-            </span>
-            <code className="text-cyan-300">pg_advisory_xact_lock(hashtextextended(uid:coin, 0))</code> serializes concurrent clicks, eliminating race conditions.
-          </div>
-          <div className="p-3 bg-[#090d16] rounded-lg border border-slate-800">
-            <span className="font-semibold text-slate-200 block mb-1">
-              3. Immutable Ledger
-            </span>
-            Every successful payout atomically writes to <code className="text-cyan-300">public.claims</code> before returning a signed receipt to the client.
-          </div>
+      {/* Feature Highlights Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-400">
+        <div className="p-4 bg-[#090d16] rounded-xl border border-slate-800">
+          <span className="font-semibold text-slate-200 block mb-1 flex items-center gap-1.5">
+            <Clock className="h-4 w-4 text-cyan-400" />
+            1-Hour Recurring Claim Cycle
+          </span>
+          Faucet stations reload automatically every 60 minutes. Set a reminder and claim all 4 coins hourly.
+        </div>
+        <div className="p-4 bg-[#090d16] rounded-xl border border-slate-800">
+          <span className="font-semibold text-slate-200 block mb-1 flex items-center gap-1.5">
+            <Gift className="h-4 w-4 text-emerald-400" />
+            10% Referral Commissions
+          </span>
+          Invite friends to earn 10% commission on every claim they execute. Paid automatically in the claimed coin.
+        </div>
+        <div className="p-4 bg-[#090d16] rounded-xl border border-slate-800">
+          <span className="font-semibold text-slate-200 block mb-1 flex items-center gap-1.5">
+            <ShieldCheck className="h-4 w-4 text-cyan-400" />
+            Zero Minimum Barrier
+          </span>
+          Sign up with any email address in seconds. Start building your cryptocurrency portfolio immediately.
         </div>
       </div>
     </div>

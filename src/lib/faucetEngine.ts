@@ -256,7 +256,8 @@ export class FaucetEngine {
     try {
       const db = loadSandboxDb();
 
-      // Check user claims for cooldown (60 seconds)
+      // Check user claims for cooldown (1 hour = 3600 seconds)
+      const COOLDOWN_SECONDS = 3600;
       const userClaims = db.claims
         .filter((c) => c.user_id === user.id && c.coin === coin)
         .sort(
@@ -268,11 +269,14 @@ export class FaucetEngine {
       if (lastClaim) {
         const lastTime = new Date(lastClaim.claimed_at).getTime();
         const diffSeconds = (Date.now() - lastTime) / 1000;
-        if (diffSeconds < 60) {
-          const waitTime = Math.ceil(60 - diffSeconds);
+        if (diffSeconds < COOLDOWN_SECONDS) {
+          const waitTime = Math.ceil(COOLDOWN_SECONDS - diffSeconds);
+          const mins = Math.floor(waitTime / 60);
+          const secs = waitTime % 60;
+          const waitDisplay = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
           return {
             success: false,
-            message: 'Please wait before making another claim for this coin.',
+            message: `Please wait ${waitDisplay} before making another claim for this coin (1-hour cooldown).`,
             timeRemaining: waitTime,
             advisoryLockUsed: true,
           };
@@ -431,8 +435,9 @@ export class FaucetEngine {
       if (coinClaims.length > 0) {
         const lastClaimTime = new Date(coinClaims[0].claimed_at).getTime();
         const elapsed = (now - lastClaimTime) / 1000;
-        if (elapsed < 60) {
-          result[coin] = Math.ceil(60 - elapsed);
+        const COOLDOWN_SECONDS = 3600;
+        if (elapsed < COOLDOWN_SECONDS) {
+          result[coin] = Math.ceil(COOLDOWN_SECONDS - elapsed);
         }
       }
     }

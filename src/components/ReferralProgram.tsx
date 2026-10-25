@@ -37,7 +37,7 @@ export const ReferralProgram: React.FC<ReferralProgramProps> = ({ currentUser })
   };
 
   const shareText = encodeURIComponent(
-    `Claim free BTC, LTC, DOGE, and USDT every 60 seconds on FaucetFlow! Join with my invite link to get instant access:`
+    `Claim free BTC, LTC, DOGE, and USDT every 1 hour on FaucetFlow! Join with my invite link to get instant access:`
   );
   const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(
     refData.inviteUrl

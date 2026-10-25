@@ -1,24 +1,21 @@
 import React from 'react';
-import { FaucetUser } from '../types/faucet';
+import { FaucetUser, CoinType } from '../types/faucet';
 import {
-  Database,
   Droplets,
   History,
-  Code,
   Send,
   LogIn,
   UserPlus,
-  LogOut,
-  UserCheck,
+  Gift,
 } from 'lucide-react';
 import { TELEGRAM_INVITE_URL } from './TelegramContact';
+import { UserProfileMenu } from './UserProfileMenu';
 
 interface NavbarProps {
-  currentTab: 'faucet' | 'claims' | 'referrals' | 'sql';
-  setCurrentTab: (tab: 'faucet' | 'claims' | 'referrals' | 'sql') => void;
-  currentUser: FaucetUser;
-  isLiveSupabase: boolean;
-  onOpenSettings: () => void;
+  currentTab: 'faucet' | 'claims' | 'referrals';
+  setCurrentTab: (tab: 'faucet' | 'claims' | 'referrals') => void;
+  currentUser: FaucetUser | null;
+  balances: Record<CoinType, number>;
   onOpenSignIn: () => void;
   onOpenSignUp: () => void;
   onSignOut: () => void;
@@ -28,16 +25,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   setCurrentTab,
   currentUser,
-  isLiveSupabase,
-  onOpenSettings,
+  balances,
   onOpenSignIn,
   onOpenSignUp,
   onSignOut,
 }) => {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-[#090d16]/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-[#090d16]/95 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8">
-        {/* Zone 1: Single text element wordmark */}
+        {/* Zone 1: Logo and Brand Name */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setCurrentTab('faucet')}
@@ -50,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Zone 2: Clean single-line text navigation links for standard users */}
+        {/* Zone 2: Navigation Links (Faucet, Claims, Referrals, Telegram) */}
         <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-300">
           <button
             onClick={() => setCurrentTab('faucet')}
@@ -61,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             <Droplets className="h-3.5 w-3.5" />
-            <span>Faucet Stations</span>
+            <span>Faucet Stations (1h)</span>
           </button>
 
           <button
@@ -84,25 +80,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : 'hover:text-white'
             }`}
           >
-            <Droplets className="hidden" />
-            <span className="flex items-center gap-1 text-emerald-400">
-              <span>Invite & 10% Bonus</span>
-            </span>
+            <Gift className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-emerald-400">Invite & 10% Bonus</span>
           </button>
 
-          <button
-            onClick={() => setCurrentTab('sql')}
-            className={`flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 py-1 ${
-              currentTab === 'sql'
-                ? 'text-cyan-400 border-b-2 border-cyan-400 font-semibold'
-                : 'hover:text-white'
-            }`}
-          >
-            <Code className="h-3.5 w-3.5" />
-            <span>SQL Workbench</span>
-          </button>
-
-          {/* Direct Telegram Link in Nav */}
+          {/* Telegram Channel Link */}
           <a
             href={TELEGRAM_INVITE_URL}
             target="_blank"
@@ -114,61 +96,47 @@ export const Navbar: React.FC<NavbarProps> = ({
           </a>
         </nav>
 
-        {/* Zone 3: Distinct Separate Buttons for Sign In & Sign Up + User Status */}
+        {/* Zone 3: Profile (if logged in) OR Sign In / Sign Up buttons (if logged out) */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Database status button */}
-          <button
-            onClick={onOpenSettings}
-            className={`hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-              isLiveSupabase
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40'
-                : 'bg-slate-900 border-slate-700/60 text-slate-300 hover:bg-slate-800'
-            }`}
-            title="Configure Supabase connection"
-          >
-            <Database className="h-3.5 w-3.5 text-slate-400" />
-            <span className="whitespace-nowrap">
-              {isLiveSupabase ? 'Supabase' : 'Postgres'}
-            </span>
-          </button>
+          {currentUser ? (
+            /* When logged in: Sign In and Sign Up buttons are replaced by User Profile */
+            <UserProfileMenu
+              currentUser={currentUser}
+              balances={balances}
+              onSignOut={onSignOut}
+              onNavigateToClaims={() => setCurrentTab('claims')}
+              onNavigateToReferrals={() => setCurrentTab('referrals')}
+            />
+          ) : (
+            /* When logged out: Show distinct Sign In and Sign Up buttons */
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={onOpenSignIn}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/90 rounded-lg transition-colors whitespace-nowrap shrink-0 shadow-sm"
+              >
+                <LogIn className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Sign In</span>
+              </button>
 
-          {/* Active user email pill / badge if logged in */}
-          {currentUser && (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 text-xs text-slate-400 bg-slate-900/80 border border-slate-800 rounded-lg">
-              <UserCheck className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-              <span className="font-mono text-slate-300 max-w-[120px] truncate">
-                {currentUser.username || currentUser.email.split('@')[0]}
-              </span>
+              <button
+                onClick={onOpenSignUp}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 rounded-lg transition-all whitespace-nowrap shrink-0 shadow-md shadow-cyan-950/30 active:scale-[0.98]"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>Sign Up</span>
+              </button>
             </div>
           )}
-
-          {/* SEPARATE BUTTON 1: SIGN IN */}
-          <button
-            onClick={onOpenSignIn}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white bg-slate-900 hover:bg-slate-800 border border-slate-700/90 rounded-lg transition-colors whitespace-nowrap shrink-0 shadow-sm"
-          >
-            <LogIn className="h-3.5 w-3.5 text-cyan-400" />
-            <span>Sign In</span>
-          </button>
-
-          {/* SEPARATE BUTTON 2: SIGN UP */}
-          <button
-            onClick={onOpenSignUp}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 rounded-lg transition-all whitespace-nowrap shrink-0 shadow-md shadow-cyan-950/30 active:scale-[0.98]"
-          >
-            <UserPlus className="h-3.5 w-3.5" />
-            <span>Sign Up</span>
-          </button>
         </div>
       </div>
 
-      {/* Mobile nav row with direct navigation & actions */}
+      {/* Mobile nav row */}
       <div className="flex lg:hidden border-t border-slate-800/80 bg-slate-900/60 px-4 py-2 overflow-x-auto gap-4 text-xs font-medium text-slate-300">
         <button
           onClick={() => setCurrentTab('faucet')}
           className={`whitespace-nowrap ${currentTab === 'faucet' ? 'text-cyan-400 font-bold' : ''}`}
         >
-          Faucet
+          Faucet (1h)
         </button>
         <button
           onClick={() => setCurrentTab('claims')}
@@ -181,12 +149,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           className={`whitespace-nowrap ${currentTab === 'referrals' ? 'text-emerald-400 font-bold' : 'text-emerald-400/90'}`}
         >
           Invite (10%)
-        </button>
-        <button
-          onClick={() => setCurrentTab('sql')}
-          className={`whitespace-nowrap ${currentTab === 'sql' ? 'text-cyan-400 font-bold' : ''}`}
-        >
-          SQL Schema
         </button>
         <a
           href={TELEGRAM_INVITE_URL}
