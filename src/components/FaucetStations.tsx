@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CoinType, COIN_SPECS, FaucetUser } from '../types/faucet';
 import { CoinIcon } from './CoinIcon';
+import { MiddleAdsSection } from './AdBanners';
 import {
   Clock,
   Lock,
@@ -335,6 +336,9 @@ export const FaucetStations: React.FC<FaucetStationsProps> = ({
           );
         })}
       </div>
+
+      {/* Centered Middle Ads (Majhe) - 468x60 Banner & Native Ad */}
+      <MiddleAdsSection title="Sponsored Rewards & Community Offers" />
 
       {/* Offerwalls Promotion Banner: Junkie & Adollar */}
       <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-950/40 via-slate-900 to-indigo-950/40 p-5 sm:p-6 shadow-xl">

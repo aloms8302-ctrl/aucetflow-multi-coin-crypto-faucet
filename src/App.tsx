@@ -12,6 +12,7 @@ import { ReferralProgram } from './components/ReferralProgram';
 import { Offerwalls } from './components/Offerwalls';
 import { TelegramContact, TELEGRAM_INVITE_URL } from './components/TelegramContact';
 import { AuthModal } from './components/AuthModal';
+import { MiddleAdsSection } from './components/AdBanners';
 import {
   CheckCircle2,
   AlertCircle,
@@ -347,7 +348,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Tab 1: Faucet Stations */}
+        {/* Tab 1: Faucet Stations (includes centered MiddleAdsSection in the middle between coin claim stations and offerwall banner) */}
         {userTab === 'faucet' && (
           <FaucetStations
             currentUser={currentUser}
@@ -405,6 +406,11 @@ export default function App() {
               </button>
             </div>
           )
+        )}
+
+        {/* Centered Middle Ads Section for non-faucet tabs */}
+        {userTab !== 'faucet' && (
+          <MiddleAdsSection title="Sponsored Rewards & Community Offers" />
         )}
 
         {/* Official Telegram Contact & Community */}
