@@ -12,7 +12,7 @@ import { ReferralProgram } from './components/ReferralProgram';
 import { Offerwalls } from './components/Offerwalls';
 import { TelegramContact, TELEGRAM_INVITE_URL } from './components/TelegramContact';
 import { AuthModal } from './components/AuthModal';
-import { MiddleAdsSection } from './components/AdBanners';
+import { TopAdsSection, MiddleAdsSection } from './components/AdBanners';
 import { PopunderAdHelper } from './components/PopunderAdHelper';
 import {
   CheckCircle2,
@@ -265,9 +265,12 @@ export default function App() {
         onSignOut={handleSignOut}
       />
 
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8 space-y-10">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
         {/* Popunder Diagnostics & Iframe Helper */}
         <PopunderAdHelper />
+
+        {/* Top Advertisements Showcase - Visible immediately upon opening page */}
+        <TopAdsSection />
 
         {/* Top Strip: Dynamic depending on whether user is signed in or out */}
         <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/40 border border-slate-800/80 px-4 py-2.5 rounded-xl text-xs">
